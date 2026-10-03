@@ -48,6 +48,10 @@ Quit any time with `q`; running it again resumes where you stopped.
     lengths, timings, salted hashes in place of session ids. No text, paths or project names.
   - **with text**: also the three messages you saw and your notes. Only if you are fine sharing them.
 - `stopcoder export` prints exactly what would be sent.
+- It is sent over HTTPS to `https://api.monperrus.com/stopcoder/v1/submit`, which runs
+  [`stopcoder/_collector.py`](stopcoder/_collector.py): it stores the JSON as one file and
+  nothing else (no IP address). If sending fails, the export stays in
+  `~/.local/state/stopcoder/` to send by hand.
 
 ## Other commands
 

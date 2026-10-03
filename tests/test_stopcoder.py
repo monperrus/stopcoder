@@ -116,3 +116,25 @@ def test_cli_status_without_state(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
 
 def test_cli_annotate_refuses_without_tty(capsys: pytest.CaptureFixture[str]) -> None:
     assert main([]) == 2
+
+
+def test_collector_roundtrip(tmp_path: Path) -> None:
+    import threading
+    from http.server import ThreadingHTTPServer
+
+    from stopcoder import _collector
+    from stopcoder._send import post
+
+    _collector.Handler.data_dir = tmp_path
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), _collector.Handler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    url = f"http://127.0.0.1:{srv.server_address[1]}/stopcoder/v1/submit"
+    try:
+        reply = json.loads(post({"tool": "stopcoder", "items": [{"label": "PICK"}]}, url))
+        assert reply["ok"] and reply["labelled"] == 1
+        assert len(list(tmp_path.glob("*.json"))) == 1
+        with pytest.raises(OSError):  # urllib raises HTTPError (an OSError) on 422
+            post({"tool": "other", "items": []}, url)
+        assert len(list(tmp_path.glob("*.json"))) == 1
+    finally:
+        srv.shutdown()
