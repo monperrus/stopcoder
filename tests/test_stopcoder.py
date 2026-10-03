@@ -85,6 +85,17 @@ def test_agentknit_stops_skip_automated_wakes(tmp_path: Path) -> None:
     assert stops[0].started.startswith("2026-10-01T10:00") and stops[0].idle_seconds == 59 * 60
 
 
+def test_wrap_keeps_lines_and_hangs_list_items() -> None:
+    from stopcoder._tui import _wrap
+
+    text = "Summary line.\n\n- Need from you:\n  - Q17.1: Can I open one ten-minute connection to the stream?"
+    lines = _wrap(text, 30)
+    assert lines[:3] == ["Summary line.", "", "- Need from you:"]
+    assert lines[3].startswith("  - Q17.1")
+    assert lines[4:] and all(ln.startswith("    ") and ln[4] != " " for ln in lines[4:])  # under "Q17.1"
+    assert not any(ln.endswith("ten-") for ln in lines)  # no breaks inside hyphenated words
+
+
 def test_discovery_excludes_subagents(tmp_path: Path) -> None:
     _claude(tmp_path / ".claude/projects/p/a.jsonl", [("a", "b"), ("c", "d")])
     _claude(tmp_path / ".claude/projects/p/a/subagents/x.jsonl", [("a", "b"), ("c", "d")])

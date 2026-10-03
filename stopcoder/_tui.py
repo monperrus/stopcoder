@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import curses
+import re
 import textwrap
 import time
 from typing import Any
@@ -24,10 +25,17 @@ def _human_duration(s: float | None) -> str:
     return f"{s / 86400:.1f} d"
 
 
+_HANG = re.compile(r"^(\s*(?:[-*+]|\d+[.)])\s+|\s+)")
+
+
 def _wrap(text: str, width: int) -> list[str]:
+    """Wrap each line of text; continuation lines hang under a list item's text or a line's indent."""
     out: list[str] = []
     for para in text.splitlines() or [""]:
-        out.extend(textwrap.wrap(para, width, replace_whitespace=False, drop_whitespace=True) or [""])
+        m = _HANG.match(para)
+        hang = " " * min(len(m.group(1)), width // 2) if m else ""
+        out.extend(textwrap.wrap(para, width, subsequent_indent=hang, replace_whitespace=False,
+                                 drop_whitespace=True, break_on_hyphens=False) or [""])
     return out
 
 
