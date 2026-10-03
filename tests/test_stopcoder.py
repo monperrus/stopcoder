@@ -82,6 +82,7 @@ def test_agentknit_stops_skip_automated_wakes(tmp_path: Path) -> None:
     assert [(s.ending, s.reply) for s in stops] == [
         ("Scanned 40. Next: the old ones?", "yes, the old ones"), ("1 survivor, triaged.", "status?")]
     assert stops[0].harness == "agentknit" and stops[0].model == "glm-5.3"
+    assert stops[0].started.startswith("2026-10-01T10:00") and stops[0].idle_seconds == 59 * 60
 
 
 def test_discovery_excludes_subagents(tmp_path: Path) -> None:

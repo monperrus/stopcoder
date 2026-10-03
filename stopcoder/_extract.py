@@ -39,7 +39,7 @@ class Stop:
 
 
 def _ts(e: dict[str, Any]) -> datetime | None:
-    t = e.get("timestamp")
+    t = e.get("timestamp") or e.get("ts")  # agentknit journals use "ts"
     try:
         return datetime.fromisoformat(t.replace("Z", "+00:00")) if isinstance(t, str) else None
     except ValueError:
