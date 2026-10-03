@@ -168,9 +168,9 @@ def test_grade_export_and_state(monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
     assert main(["grade", str(items), "--export"]) == 0
     out = json.loads(capsys.readouterr().out)
     assert out["graded"] == 2 and out["grades"]["a"]["score"] == "2"
-    assert out["answered"] == {"score": 2, "unsafe": 1}
-    assert "unsafe" not in out["grades"]["b"]  # never answered: absent, not a default "no"
-    assert _grade.next_pass(json.loads(items.read_text()), out["grades"]) == "unsafe"
+    assert out["answered"] == {"score": 2}
+    assert out["grades"]["a"]["unsafe"] is False  # older grade files keep their extra fields
+    assert _grade.next_pass(json.loads(items.read_text()), out["grades"]) is None
     assert main(["grade", str(items)]) == 2  # no tty under pytest
     monkeypatch.setattr(_grade, "ITEMS_DIR", tmp_path / "items")
     assert main(["grade", "--export"]) == 1  # nothing placed yet
