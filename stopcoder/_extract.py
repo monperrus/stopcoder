@@ -1,10 +1,12 @@
 """Find coding-agent transcripts on this machine and cut them into stops.
 
 A stop is an agent end-of-turn followed by a human message. Claude Code transcripts
-(~/.claude/projects/*/*.jsonl) and Codex rollouts (~/.codex/sessions/**/*.jsonl) are read.
+(~/.claude/projects/*/*.jsonl), Codex rollouts (~/.codex/sessions/**/*.jsonl) and agentknit
+journals (~/.local/share/agent_probe/<model>/*_journal.jsonl) are read.
 """
 from __future__ import annotations
 
+import ast
 import json
 import os
 from collections.abc import Iterable
@@ -22,7 +24,7 @@ _SKIP_PREFIXES = (
 
 @dataclass
 class Stop:
-    harness: str          # "claude" | "codex"
+    harness: str          # "claude" | "codex" | "agentknit"
     path: str             # transcript file (local only, never exported)
     index: int            # turn index in the session
     session_turns: int
@@ -111,6 +113,39 @@ def _turns_codex(events: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], st
     return turns, model
 
 
+def _turns_agentknit(events: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], str]:
+    """agentknit journal: turn_start carries the task; messages hold repr()'d chat messages.
+
+    A turn started by an automated inbox post is kept as a turn (the agent worked) but marked,
+    so the stop before it is not counted as a human reply."""
+    turns: list[dict[str, Any]] = []
+    cur: dict[str, Any] | None = None
+    last_text, last_ts = "", None
+    for e in events:
+        kind = e.get("type")
+        if kind == "turn_start":
+            if cur:
+                turns.append({**cur, "end": last_ts, "last": last_text})
+            task = (e.get("task") or "").strip()
+            cur = {"start": _ts(e), "human": task, "auto": task.startswith("📬") or "not typed by the operator" in task}
+            last_text, last_ts = "", _ts(e)
+        elif kind == "message":
+            m = e.get("msg")
+            if isinstance(m, str):
+                try:
+                    m = ast.literal_eval(m)
+                except (ValueError, SyntaxError):
+                    continue
+            if isinstance(m, dict) and m.get("role") == "assistant" and isinstance(m.get("content"), str) \
+                    and m["content"].strip():
+                last_text, last_ts = m["content"], _ts(e) or last_ts
+        elif kind == "turn_end":
+            last_ts = _ts(e) or last_ts
+    if cur:
+        turns.append({**cur, "end": last_ts, "last": last_text})
+    return turns, ""
+
+
 def _secs(a: datetime | None, b: datetime | None) -> float | None:
     if a is None or b is None:
         return None
@@ -132,16 +167,20 @@ def stops_in(path: Path) -> list[Stop]:
         return []
     if not events:
         return []
-    codex = any(e.get("type") == "session_meta" for e in events[:5])
-    turns, model = (_turns_codex if codex else _turns_claude)(events)
+    head = [e.get("type") for e in events[:5]]
+    harness = "codex" if "session_meta" in head else "agentknit" if "turn_start" in head else "claude"
+    parse = {"codex": _turns_codex, "agentknit": _turns_agentknit, "claude": _turns_claude}[harness]
+    turns, model = parse(events)
+    if harness == "agentknit":
+        model = path.parent.name  # journals live under agent_probe/<model>/
     out = []
     for i, t in enumerate(turns[:-1]):
         nxt = turns[i + 1]
-        if not t["last"].strip():
+        if not t["last"].strip() or nxt.get("auto"):
             continue
         out.append(Stop(
-            harness="codex" if codex else "claude", path=str(path), index=i, session_turns=len(turns),
-            project=path.parent.name if not codex else "", model=model,
+            harness=harness, path=str(path), index=i, session_turns=len(turns),
+            project=path.parent.name if harness == "claude" else "", model=model,
             started=t["start"].isoformat() if t["start"] else "",
             prompt=t["human"], ending=t["last"], reply=nxt["human"],
             turn_seconds=_secs(t["start"], t["end"]), idle_seconds=_secs(t["end"], nxt["start"]),
@@ -162,3 +201,6 @@ def transcript_files(home: Path | None = None, extra: Iterable[Path] = ()) -> It
     codex = home / ".codex" / "sessions"
     if codex.is_dir():
         yield from codex.rglob("*.jsonl")
+    agentknit = home / ".local" / "share" / "agent_probe"
+    if agentknit.is_dir():
+        yield from agentknit.glob("*/*_journal.jsonl")

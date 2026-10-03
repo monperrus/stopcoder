@@ -59,6 +59,31 @@ def test_codex_stops(tmp_path: Path) -> None:
     assert stops[0].harness == "codex" and stops[0].model == "gpt-5.6"
 
 
+def test_agentknit_stops_skip_automated_wakes(tmp_path: Path) -> None:
+    def msg(role: str, content: str) -> dict:
+        return {"type": "message", "ts": "2026-10-01T10:00:05+02:00", "msg": repr({"role": role, "content": content})}
+
+    ev = [{"type": "turn_start", "ts": "2026-10-01T10:00:00+02:00", "task": "scan arbitrum"},
+          msg("user", "scan arbitrum"), msg("assistant", "Scanned 40. Next: the old ones?"),
+          {"type": "turn_end", "ts": "2026-10-01T10:01:00+02:00"},
+          {"type": "turn_start", "ts": "2026-10-01T11:00:00+02:00", "task": "yes, the old ones"},
+          msg("assistant", "Done; waiting for the cron."),
+          {"type": "turn_end", "ts": "2026-10-01T11:05:00+02:00"},
+          {"type": "turn_start", "ts": "2026-10-02T06:00:00+02:00",
+           "task": "📬 [inbox campaign-04] automated message from v3_daily — not typed by the operator"},
+          msg("assistant", "1 survivor, triaged."),
+          {"type": "turn_end", "ts": "2026-10-02T06:10:00+02:00"},
+          {"type": "turn_start", "ts": "2026-10-02T08:00:00+02:00", "task": "status?"}]
+    f = tmp_path / "agent_probe" / "glm-5.3" / "abc_journal.jsonl"
+    f.parent.mkdir(parents=True)
+    f.write_text("\n".join(json.dumps(e) for e in ev) + "\n")
+    stops = stops_in(f)
+    # the stop before the automated wake is not a human reply; the one after it is
+    assert [(s.ending, s.reply) for s in stops] == [
+        ("Scanned 40. Next: the old ones?", "yes, the old ones"), ("1 survivor, triaged.", "status?")]
+    assert stops[0].harness == "agentknit" and stops[0].model == "glm-5.3"
+
+
 def test_discovery_excludes_subagents(tmp_path: Path) -> None:
     _claude(tmp_path / ".claude/projects/p/a.jsonl", [("a", "b"), ("c", "d")])
     _claude(tmp_path / ".claude/projects/p/a/subagents/x.jsonl", [("a", "b"), ("c", "d")])

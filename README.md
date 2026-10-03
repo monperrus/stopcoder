@@ -1,6 +1,6 @@
 # stopcoder
 
-Label why your coding agent stopped, from your own Claude Code and Codex history.
+Label why your coding agent stopped, from your own Claude Code, Codex and agentknit history.
 
 Every time an agent ends its turn and you reply, your reply carries something the agent lacked:
 nothing at all ("yes, go on"), a choice between options it offered, a goal it could not know,
@@ -40,7 +40,8 @@ Quit any time with `q`; running it again resumes where you stopped.
 
 ## Privacy
 
-- Transcripts are read locally from `~/.claude/projects` and `~/.codex/sessions`.
+- Transcripts are read locally from `~/.claude/projects`, `~/.codex/sessions` and
+  `~/.local/share/agent_probe`.
 - Progress is kept in `~/.local/state/stopcoder/annotation.json` (mode 600). It holds the text
   you see, and it never leaves your machine by itself.
 - At the end you choose what to send:
