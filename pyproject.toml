@@ -13,7 +13,6 @@ dependencies = []
 
 [project.scripts]
 stopcoder = "stopcoder._cli:main"
-stopcoder-collector = "stopcoder._collector:main"
 
 [project.optional-dependencies]
 dev = ["pytest", "pytest-cov", "mypy", "ruff"]

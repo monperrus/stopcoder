@@ -118,23 +118,29 @@ def test_cli_annotate_refuses_without_tty(capsys: pytest.CaptureFixture[str]) ->
     assert main([]) == 2
 
 
-def test_collector_roundtrip(tmp_path: Path) -> None:
-    import threading
-    from http.server import ThreadingHTTPServer
+COLLECTOR = Path(__file__).parent.parent / "collector" / "stopcoder.py"
 
-    from stopcoder import _collector
-    from stopcoder._send import post
 
-    _collector.Handler.data_dir = tmp_path
-    srv = ThreadingHTTPServer(("127.0.0.1", 0), _collector.Handler)
-    threading.Thread(target=srv.serve_forever, daemon=True).start()
-    url = f"http://127.0.0.1:{srv.server_address[1]}/stopcoder/v1/submit"
-    try:
-        reply = json.loads(post({"tool": "stopcoder", "items": [{"label": "PICK"}]}, url))
-        assert reply["ok"] and reply["labelled"] == 1
-        assert len(list(tmp_path.glob("*.json"))) == 1
-        with pytest.raises(OSError):  # urllib raises HTTPError (an OSError) on 422
-            post({"tool": "other", "items": []}, url)
-        assert len(list(tmp_path.glob("*.json"))) == 1
-    finally:
-        srv.shutdown()
+def _cgi(tmp_path: Path, method: str, body: bytes = b"") -> tuple[str, dict]:
+    import os
+    import subprocess
+    import sys
+
+    env = {**os.environ, "REQUEST_METHOD": method, "CONTENT_LENGTH": str(len(body)),
+           "STOPCODER_DATA": str(tmp_path / "sub")}
+    out = subprocess.run([sys.executable, str(COLLECTOR)], input=body, env=env, capture_output=True,
+                         check=True).stdout.decode()
+    head, _, rest = out.partition("\n\n")
+    return head.splitlines()[0], json.loads(rest)
+
+
+def test_collector_cgi(tmp_path: Path) -> None:
+    status, body = _cgi(tmp_path, "POST", json.dumps({"tool": "stopcoder", "items": [{"label": "PICK"}]}).encode())
+    assert status == "Status: 200" and body["labelled"] == 1
+    files = list((tmp_path / "sub").glob("*.json"))
+    assert len(files) == 1 and oct(files[0].stat().st_mode)[-3:] == "600"
+    assert oct((tmp_path / "sub").stat().st_mode)[-3:] == "700"
+    assert _cgi(tmp_path, "POST", b'{"tool": "other"}')[0] == "Status: 422"
+    assert _cgi(tmp_path, "POST", b"not json")[0] == "Status: 400"
+    assert _cgi(tmp_path, "GET")[1]["ok"] is True
+    assert len(list((tmp_path / "sub").glob("*.json"))) == 1

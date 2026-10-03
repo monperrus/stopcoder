@@ -10,5 +10,5 @@ jobs:
           python-version: "3.13"
       - run: pip install -e '.[dev]'
       - run: ruff check .
-      - run: mypy stopcoder
+      - run: mypy stopcoder && mypy collector/stopcoder.py
       - run: pytest -q --cov=stopcoder

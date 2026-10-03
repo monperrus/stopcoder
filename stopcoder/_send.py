@@ -7,8 +7,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-# The study's collector (stopcoder/_collector.py behind TLS); $STOPCODER_ENDPOINT or --to override it.
-DEFAULT_ENDPOINT = "https://api.monperrus.com/stopcoder/v1/submit"
+# The study's collector (collector/stopcoder.py, a CGI script); $STOPCODER_ENDPOINT or --to override it.
+DEFAULT_ENDPOINT = "https://api.monperrus.com/stopcoder"
 
 
 def endpoint(override: str | None = None) -> str:
