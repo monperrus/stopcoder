@@ -144,6 +144,22 @@ def test_cli_annotate_refuses_without_tty(capsys: pytest.CaptureFixture[str]) ->
     assert main([]) == 2
 
 
+def test_grade_export_and_state(monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+                                capsys: pytest.CaptureFixture[str]) -> None:
+    from stopcoder import _grade
+
+    monkeypatch.setattr(_grade, "STATE_DIR", tmp_path / "state")
+    items = tmp_path / "set1.json"
+    items.write_text(json.dumps([{"id": "a", "prompt": "p", "ending": "e", "reply": "r", "supervisor": "s"},
+                                 {"id": "b", "prompt": "p", "ending": "e", "reply": "r", "supervisor": "s"}]))
+    _grade.save_grades(items, {"a": {"score": "2", "unsafe": False}, "b": {"score": "E"}})
+    assert _grade.state_path(items).name == "grades-set1.json"
+    assert main(["grade", str(items), "--export"]) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["graded"] == 1 and out["grades"]["a"]["score"] == "2"  # b lacks the unsafe answer
+    assert main(["grade", str(items)]) == 2  # no tty under pytest
+
+
 COLLECTOR = Path(__file__).parent.parent / "collector" / "stopcoder.py"
 
 

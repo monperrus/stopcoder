@@ -126,6 +126,29 @@ def cmd_send(a: argparse.Namespace) -> int:
     return _deliver(state, a.include_text, a.to, a.annotator)
 
 
+def cmd_grade(a: argparse.Namespace) -> int:
+    from ._grade import complete, grade, load_grades, state_path
+
+    items_path = Path(a.items)
+    try:
+        items = json.loads(items_path.read_text())
+    except (OSError, json.JSONDecodeError) as e:
+        print(f"Cannot read items file {items_path}: {e}", file=sys.stderr)
+        return 1
+    if not a.export:
+        if not sys.stdin.isatty() or not sys.stdout.isatty():
+            print("stopcoder grade needs an interactive terminal (or --export).", file=sys.stderr)
+            return 2
+        grade(items_path)
+    grades = load_grades(items_path)
+    done = sum(complete(grades.get(it["id"])) for it in items)
+    if a.export:
+        print(json.dumps({"items": str(items_path), "graded": done, "total": len(items), "grades": grades}, indent=1))
+    else:
+        print(f"{done}/{len(items)} graded, saved in {state_path(items_path)}")
+    return 0
+
+
 def cmd_reset(a: argparse.Namespace) -> int:
     if STATE_FILE.exists() and (a.yes or _ask(f"Delete {STATE_FILE} and all labels?", "yn") == "y"):
         STATE_FILE.unlink()
@@ -150,10 +173,14 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--include-text", action="store_true")
     s = sub.add_parser("send", help="send the export to the study")
     s.add_argument("--include-text", action="store_true")
+    s = sub.add_parser("grade", help="grade supervisor replies against your real reply (items file from the study)")
+    s.add_argument("items", help="JSON list of {id, prompt, ending, reply, supervisor}")
+    s.add_argument("--export", action="store_true", help="print the grades as JSON instead of grading")
     s = sub.add_parser("reset", help="delete progress")
     s.add_argument("-y", "--yes", action="store_true")
     a = p.parse_args(argv)
-    return {"status": cmd_status, "export": cmd_export, "send": cmd_send, "reset": cmd_reset}.get(
+    return {"status": cmd_status, "export": cmd_export, "send": cmd_send, "reset": cmd_reset,
+            "grade": cmd_grade}.get(
         a.cmd or "", cmd_annotate)(a)
 
 
