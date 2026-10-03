@@ -158,6 +158,13 @@ def test_grade_export_and_state(monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
     out = json.loads(capsys.readouterr().out)
     assert out["graded"] == 1 and out["grades"]["a"]["score"] == "2"  # b lacks the unsafe answer
     assert main(["grade", str(items)]) == 2  # no tty under pytest
+    monkeypatch.setattr(_grade, "ITEMS_DIR", tmp_path / "items")
+    assert main(["grade", "--export"]) == 1  # nothing placed yet
+    (tmp_path / "items").mkdir()
+    (tmp_path / "items" / "set1.json").write_text(items.read_text())
+    capsys.readouterr()
+    assert main(["grade", "--export"]) == 0
+    assert json.loads(capsys.readouterr().out)["graded"] == 1
 
 
 COLLECTOR = Path(__file__).parent.parent / "collector" / "stopcoder.py"

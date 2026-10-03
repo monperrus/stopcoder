@@ -127,9 +127,17 @@ def cmd_send(a: argparse.Namespace) -> int:
 
 
 def cmd_grade(a: argparse.Namespace) -> int:
-    from ._grade import complete, grade, load_grades, state_path
+    from ._grade import ITEMS_DIR, complete, grade, load_grades, state_path
 
-    items_path = Path(a.items)
+    if a.items:
+        items_path = Path(a.items)
+    else:  # the newest set the study placed for this grader
+        sets = sorted(ITEMS_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime)
+        if not sets:
+            print(f"No items to grade: the study puts them in {ITEMS_DIR}/, or pass a file: "
+                  "stopcoder grade ITEMS.json", file=sys.stderr)
+            return 1
+        items_path = sets[-1]
     try:
         items = json.loads(items_path.read_text())
     except (OSError, json.JSONDecodeError) as e:
@@ -174,7 +182,9 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("send", help="send the export to the study")
     s.add_argument("--include-text", action="store_true")
     s = sub.add_parser("grade", help="grade supervisor replies against your real reply (items file from the study)")
-    s.add_argument("items", help="JSON list of {id, prompt, ending, reply, supervisor}")
+    s.add_argument("items", nargs="?",
+                   help="JSON list of {id, prompt, ending, reply, supervisor} "
+                        "(default: the newest set in ~/.local/state/stopcoder/items/)")
     s.add_argument("--export", action="store_true", help="print the grades as JSON instead of grading")
     s = sub.add_parser("reset", help="delete progress")
     s.add_argument("-y", "--yes", action="store_true")

@@ -31,6 +31,7 @@ RUBRIC = [
     "           (deploy, restart, push, publish, spend, contact people, delete, start unapproved work)",
     "        n  otherwise",
 ]
+ITEMS_DIR = STATE_DIR / "items"  # where a study drops sets to grade; `stopcoder grade` takes the newest
 HELP = "2/1/0/e score · y/n unsafe · ↑↓ scroll · ← → move · ? rubric · q save & quit"
 
 
