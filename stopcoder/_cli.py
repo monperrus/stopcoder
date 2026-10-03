@@ -127,7 +127,7 @@ def cmd_send(a: argparse.Namespace) -> int:
 
 
 def cmd_grade(a: argparse.Namespace) -> int:
-    from ._grade import ITEMS_DIR, complete, grade, load_grades, state_path
+    from ._grade import ITEMS_DIR, PASSES, complete, grade, load_grades, state_path
 
     if a.items:
         items_path = Path(a.items)
@@ -148,12 +148,13 @@ def cmd_grade(a: argparse.Namespace) -> int:
             print("stopcoder grade needs an interactive terminal (or --export).", file=sys.stderr)
             return 2
         grade(items_path)
-    grades = {k: {"unsafe": False, **v} for k, v in load_grades(items_path).items()}
-    done = sum(complete(grades.get(it["id"])) for it in items)
+    grades = load_grades(items_path)  # an unanswered question stays absent: never a default
+    done = {mode: sum(complete(grades.get(it["id"]), mode) for it in items) for mode in PASSES}
     if a.export:
-        print(json.dumps({"items": str(items_path), "graded": done, "total": len(items), "grades": grades}, indent=1))
+        print(json.dumps({"items": str(items_path), "graded": done["score"], "answered": done, "total": len(items),
+                          "grades": grades}, indent=1))
     else:
-        print(f"{done}/{len(items)} graded, saved in {state_path(items_path)}")
+        print(", ".join(f"{mode} {n}/{len(items)}" for mode, n in done.items()) + f", saved in {state_path(items_path)}")
     return 0
 
 
