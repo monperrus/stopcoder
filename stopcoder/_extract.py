@@ -96,6 +96,13 @@ def _turns_codex(events: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], st
         if e.get("type") != "event_msg":
             continue
         kind = p.get("type")
+        if kind == "item_completed":  # codex >= 0.157: messages are items, not user_/agent_message
+            item = p.get("item") or {}
+            text = "\n".join(c.get("text", "") for c in item.get("content") or [] if isinstance(c, dict)).strip()
+            if item.get("type") == "UserMessage" and text:
+                kind, p = "user_message", {"message": text}
+            elif item.get("type") == "AgentMessage" and text:
+                kind, p = "agent_message", {"message": text}
         if kind == "user_message" and (p.get("message") or "").strip():
             msg = p["message"].strip()
             if msg.startswith(_SKIP_PREFIXES):
@@ -108,6 +115,7 @@ def _turns_codex(events: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], st
             last_text, last_ts = p.get("message") or last_text, _ts(e) or last_ts
         elif kind == "task_complete":
             last_ts = _ts(e) or last_ts
+            last_text = (p.get("last_agent_message") or "").strip() or last_text
     if cur:
         turns.append({**cur, "end": last_ts, "last": last_text})
     return turns, model

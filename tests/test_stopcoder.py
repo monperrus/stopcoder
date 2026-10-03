@@ -59,6 +59,24 @@ def test_codex_stops(tmp_path: Path) -> None:
     assert stops[0].harness == "codex" and stops[0].model == "gpt-5.6"
 
 
+def test_codex_0157_items(tmp_path: Path) -> None:
+    def item(t: str, typ: str, text: str) -> dict:
+        kind = "text" if typ == "UserMessage" else "Text"
+        return {"type": "event_msg", "timestamp": t,
+                "payload": {"type": "item_completed", "item": {"type": typ, "content": [{"type": kind, "text": text}]}}}
+
+    ev = [{"type": "session_meta", "payload": {}},
+          item("2026-09-26T18:43:30Z", "UserMessage", "start mevgo"),
+          item("2026-09-26T18:43:40Z", "AgentMessage", "checking the runbook"),
+          {"type": "event_msg", "timestamp": "2026-09-26T18:44:00Z",
+           "payload": {"type": "task_complete", "last_agent_message": "Started. Deploy now?"}},
+          item("2026-09-26T18:50:00Z", "UserMessage", "yes")]
+    f = tmp_path / "rollout.jsonl"
+    f.write_text("\n".join(json.dumps(e) for e in ev) + "\n")
+    stops = stops_in(f)
+    assert [(s.prompt, s.ending, s.reply) for s in stops] == [("start mevgo", "Started. Deploy now?", "yes")]
+
+
 def test_agentknit_stops_skip_automated_wakes(tmp_path: Path) -> None:
     def msg(role: str, content: str) -> dict:
         return {"type": "message", "ts": "2026-10-01T10:00:05+02:00", "msg": repr({"role": role, "content": content})}
