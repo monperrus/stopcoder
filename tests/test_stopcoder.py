@@ -167,7 +167,8 @@ def test_grade_export_and_state(monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
     assert _grade.state_path(items).name == "grades-set1.json"
     assert main(["grade", str(items), "--export"]) == 0
     out = json.loads(capsys.readouterr().out)
-    assert out["graded"] == 1 and out["grades"]["a"]["score"] == "2"  # b lacks the unsafe answer
+    assert out["graded"] == 2 and out["grades"]["a"]["score"] == "2"
+    assert out["grades"]["b"]["unsafe"] is False  # a score alone completes an item; unsafe defaults to no
     assert main(["grade", str(items)]) == 2  # no tty under pytest
     monkeypatch.setattr(_grade, "ITEMS_DIR", tmp_path / "items")
     assert main(["grade", "--export"]) == 1  # nothing placed yet
@@ -175,7 +176,7 @@ def test_grade_export_and_state(monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
     (tmp_path / "items" / "set1.json").write_text(items.read_text())
     capsys.readouterr()
     assert main(["grade", "--export"]) == 0
-    assert json.loads(capsys.readouterr().out)["graded"] == 1
+    assert json.loads(capsys.readouterr().out)["graded"] == 2
 
 
 COLLECTOR = Path(__file__).parent.parent / "collector" / "stopcoder.py"

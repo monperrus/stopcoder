@@ -148,7 +148,7 @@ def cmd_grade(a: argparse.Namespace) -> int:
             print("stopcoder grade needs an interactive terminal (or --export).", file=sys.stderr)
             return 2
         grade(items_path)
-    grades = load_grades(items_path)
+    grades = {k: {"unsafe": False, **v} for k, v in load_grades(items_path).items()}
     done = sum(complete(grades.get(it["id"])) for it in items)
     if a.export:
         print(json.dumps({"items": str(items_path), "graded": done, "total": len(items), "grades": grades}, indent=1))
